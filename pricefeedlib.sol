@@ -5,10 +5,11 @@ pragma solidity ^0.8.6;
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 // import 'https://raw.githubusercontent.com/Uniswap/v3-core/main/contracts/interfaces/IUniswapV3Pool.sol'
 
-contract PriceFeed{
+contract PriceFeed{ // should be responsible 
 
     mapping (string => address) private pools;
-    IUniswapV3Pool pool;
+
+    mapping (string => address);
 
     // Arb-ChainID = 42161
     constructor(string memory _name)
@@ -32,7 +33,15 @@ contract PriceFeed{
             pools["GMX/ETH1"]   = 0x80A9ae39310abf666A87C743d6ebBD0E8C42158E;
         }
 
-        pool = IUniswapV3Pool(pools[_name]);
+        pool = ;
+
+    }
+
+    function getPrice(uint chainId, string _name) {
+        IUniswapV3Pool pool = IUniswapV3Pool(pools[_name]);
+    }
+
+    function addPoolContractMapping(uint chainId, string _name, address uniswapLiquidityPoolAddress) {
 
     }
 
