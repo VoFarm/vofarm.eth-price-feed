@@ -3,9 +3,11 @@ pragma solidity ^0.8.6;
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 
-// import 'https://raw.githubusercontent.com/Uniswap/v3-core/main/contracts/interfaces/IUniswapV3Pool.sol'
+// If you face any issues with this sc, feel free to raise an issue here: https://github.com/VoFarm/vofarm.eth-price-feed
+// This contract is deployed e.g. on arbitrum --> https://arbiscan.io/address/0x132Dee45D5F31e108fa5D8F94F41aa439eAdaf6D 
 
 contract PriceFeedLiquidityPoolBased {
+
     struct liquidityPoolInfoStruct {
         uint256 chainId;
         string pair;
@@ -14,29 +16,31 @@ contract PriceFeedLiquidityPoolBased {
 
     liquidityPoolInfoStruct[] liquidityPools;
 
-    // 1 "USDC/ETH3" 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8
+    // e.g. callable via: 42161 "USDC/ETH3" for prices on Arbitrum
+    function getPriceForTradingPair(uint256 chainId, string memory pair)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 priceFromSlot = getPriceFromSlot0(
+            getSlot0ForTradingPair(chainId, pair),
+            12
+        );
+
+        return priceFromSlot;
+    }
+
     function registerLiquidityPool(
         uint256 chainId,
         string memory pair,
         address lpAddress
     ) public {
-        require(
-            getLiquidityPoolAddress(chainId, pair) ==
-                0x0000000000000000000000000000000000000000,
-            "for security reasons no one (not even the dance planner) can replace a once registered liquidity pool"
-        );
-        require(
-            msg.sender == 0x4396A292512AA418087645B56a3a76333Bd10e28,
-            "please contact https://t.me/danceplanner to add a validated liquidity pool based price feed source"
-        );
+        require(getLiquidityPoolAddress(chainId, pair) == 0x0000000000000000000000000000000000000000, "for security reasons no one (not even the dance planner) can replace a once registered liquidity pool");
+        require(msg.sender == 0x4396A292512AA418087645B56a3a76333Bd10e28, "please contact https://t.me/danceplanner to add a validated liquidity pool based price feed source");
         liquidityPools.push(liquidityPoolInfoStruct(chainId, pair, lpAddress));
     }
 
-    function getRegisteredLiquidityPools()
-        public
-        view
-        returns (liquidityPoolInfoStruct[] memory)
-    {
+    function getRegisteredLiquidityPools() public view returns(liquidityPoolInfoStruct[] memory) {
         return liquidityPools;
     }
 
@@ -60,47 +64,25 @@ contract PriceFeedLiquidityPoolBased {
         return result;
     }
 
-    function getPriceForTradingPair(uint256 chainId, string memory pair)
-        public
-        view
-        returns (uint256)
-    {
-        uint256 priceFromSlot = getPriceFromSlot0(
-            getSlot0ForTradingPair(chainId, pair),
-            12
-        );
-
-        return priceFromSlot;
-    }
-
     function getSlot0ForTradingPair(uint256 chainId, string memory pair)
         public
         view
         returns (uint160)
     {
+
         address lpAddress = getLiquidityPoolAddress(chainId, pair);
 
-        require(
-            lpAddress != 0x0000000000000000000000000000000000000000,
-            "no liquidity pool registered in this smart contract for the given pair"
-        );
+        require(lpAddress != 0x0000000000000000000000000000000000000000, "no liquidity pool registered in this smart contract for the given pair");
 
         IUniswapV3Pool pool = IUniswapV3Pool(lpAddress);
 
         (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
+            uint160 sqrtPriceX96,,,,,, // those ,s are intentional - solidity is a nerd just like you reading this
         ) = pool.slot0();
 
         return sqrtPriceX96;
     }
 
-    // e.g. 1419822734404674842004188506004274 // 12 // get slot0 - compare e.g.  https://etherscan.io/address/0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640#readContract
     function getPriceFromSlot0(uint160 slot0, uint256 magicDecimalMystery)
         public
         pure
@@ -116,6 +98,7 @@ contract PriceFeedLiquidityPoolBased {
         }
         return id;
     }
+
 }
 
 //     this price feed could be tested - e.g. with the following uniswap v3 contracts
