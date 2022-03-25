@@ -6,7 +6,6 @@ import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 // import 'https://raw.githubusercontent.com/Uniswap/v3-core/main/contracts/interfaces/IUniswapV3Pool.sol'
 
 contract PriceFeedLiquidityPoolBased {
-
     struct liquidityPoolInfoStruct {
         uint256 chainId;
         string pair;
@@ -21,9 +20,24 @@ contract PriceFeedLiquidityPoolBased {
         string memory pair,
         address lpAddress
     ) public {
-        require(getLiquidityPoolAddress(chainId, pair) == 0x0000000000000000000000000000000000000000, "for security reasons no one (not even the dance planner) can replace a once registered liquidity pool");
-        require(msg.sender == 0x4396A292512AA418087645B56a3a76333Bd10e28, "please contact https://t.me/danceplanner to add a validated liquidity pool based price feed source");
+        require(
+            getLiquidityPoolAddress(chainId, pair) ==
+                0x0000000000000000000000000000000000000000,
+            "for security reasons no one (not even the dance planner) can replace a once registered liquidity pool"
+        );
+        require(
+            msg.sender == 0x4396A292512AA418087645B56a3a76333Bd10e28,
+            "please contact https://t.me/danceplanner to add a validated liquidity pool based price feed source"
+        );
         liquidityPools.push(liquidityPoolInfoStruct(chainId, pair, lpAddress));
+    }
+
+    function getRegisteredLiquidityPools()
+        public
+        view
+        returns (liquidityPoolInfoStruct[] memory)
+    {
+        return liquidityPools;
     }
 
     function getLiquidityPoolAddress(uint256 chainId, string memory pair)
@@ -64,10 +78,12 @@ contract PriceFeedLiquidityPoolBased {
         view
         returns (uint160)
     {
-
         address lpAddress = getLiquidityPoolAddress(chainId, pair);
 
-        require(lpAddress != 0x0000000000000000000000000000000000000000, "no liquidity pool registered in this smart contract for the given pair");
+        require(
+            lpAddress != 0x0000000000000000000000000000000000000000,
+            "no liquidity pool registered in this smart contract for the given pair"
+        );
 
         IUniswapV3Pool pool = IUniswapV3Pool(lpAddress);
 
