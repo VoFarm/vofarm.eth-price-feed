@@ -1,91 +1,118 @@
-// SPDX-License-Identifier: MIT 
-
+// SPDX-License-Identifier: GNU GPL V3
 pragma solidity ^0.8.6;
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
 // import 'https://raw.githubusercontent.com/Uniswap/v3-core/main/contracts/interfaces/IUniswapV3Pool.sol'
 
-contract PriceFeed{ // should be responsible 
+contract PriceFeedLiquidityPoolBased {
 
-    mapping (string => address) private pools;
+    struct liquidityPoolInfoStruct {
+        uint256 chainId;
+        string pair;
+        address lpAddress;
+    }
 
-    mapping (string => address);
+    liquidityPoolInfoStruct[] liquidityPools;
 
-    // Arb-ChainID = 42161
-    constructor(string memory _name)
+    // 1 "USDC/ETH3" 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8
+    function registerLiquidityPool(
+        uint256 chainId,
+        string memory pair,
+        address lpAddress
+    ) public {
+        require(getLiquidityPoolAddress(chainId, pair) == 0x0000000000000000000000000000000000000000, "for security reasons no one (not even the dance planner) can replace a once registered liquidity pool");
+        require(msg.sender == 0x4396A292512AA418087645B56a3a76333Bd10e28, "please contact https://t.me/danceplanner to add a validated liquidity pool based price feed source");
+        liquidityPools.push(liquidityPoolInfoStruct(chainId, pair, lpAddress));
+    }
+
+    function getLiquidityPoolAddress(uint256 chainId, string memory pair)
+        public
+        view
+        returns (address)
+    {
+        uint256 i = 0;
+        address result;
+        for (i; i < liquidityPools.length; i++) {
+            if (
+                liquidityPools[i].chainId == chainId &&
+                keccak256(abi.encodePacked(liquidityPools[i].pair)) ==
+                keccak256(abi.encodePacked(pair))
+            ) {
+                result = liquidityPools[i].lpAddress;
+            }
+        }
+
+        return result;
+    }
+
+    function getPriceForTradingPair(uint256 chainId, string memory pair)
+        public
+        view
+        returns (uint256)
+    {
+        uint256 priceFromSlot = getPriceFromSlot0(
+            getSlot0ForTradingPair(chainId, pair),
+            12
+        );
+
+        return priceFromSlot;
+    }
+
+    function getSlot0ForTradingPair(uint256 chainId, string memory pair)
+        public
+        view
+        returns (uint160)
     {
 
-        uint256 id = getChainID();
-        if (id == 1) // mainnet
-        {
-            pools["USDC/ETH05"] = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
-            pools["USDC/ETH3"]  = 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8;
-            pools["DAI/USDC01"]  = 0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168;
-            pools["WBTC/ETH3"]  = 0xCBCdF9626bC03E24f779434178A73a0B4bad62eD;
-        }
-        
-        if (id == 42161) // arbitrum
-        {
-            pools["USDC/ETH05"] = 0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443;
-            pools["USDC/ETH3"]  = 0x17c14D2c404D167802b16C450d3c99F88F2c4F4d;
-            pools["WBTC/ETH05"] = 0x2f5e87C9312fa29aed5c179E456625D79015299c;
-            pools["WBTC/ETH3"]  = 0x149e36E72726e0BceA5c59d40df2c43F60f5A22D;
-            pools["GMX/ETH1"]   = 0x80A9ae39310abf666A87C743d6ebBD0E8C42158E;
-        }
+        address lpAddress = getLiquidityPoolAddress(chainId, pair);
 
-        pool = ;
+        require(lpAddress != 0x0000000000000000000000000000000000000000, "no liquidity pool registered in this smart contract for the given pair");
 
+        IUniswapV3Pool pool = IUniswapV3Pool(lpAddress);
+
+        (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        ) = pool.slot0();
+
+        return sqrtPriceX96;
     }
 
-    function getPrice(uint chainId, string _name) {
-        IUniswapV3Pool pool = IUniswapV3Pool(pools[_name]);
-    }
-
-    function addPoolContractMapping(uint chainId, string _name, address uniswapLiquidityPoolAddress) {
-
-    }
-
-    function getChainID() private view returns(uint256)
+    // e.g. 1419822734404674842004188506004274 // 12 // get slot0 - compare e.g.  https://etherscan.io/address/0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640#readContract
+    function getPriceFromSlot0(uint160 slot0, uint256 magicDecimalMystery)
+        public
+        pure
+        returns (uint256)
     {
+        return (2**192 * (10**magicDecimalMystery)) / (uint256(slot0)**2);
+    }
+
+    function getChainID() public view returns (uint256) {
         uint256 id;
         assembly {
             id := chainid()
         }
         return id;
     }
-
-    function getX96() private view returns(uint160)
-    {
-
-        (uint160 sqrtPriceX96, 
-        int24 tick,
-        uint16 observationIndex,
-        uint16 observationCardinality,
-        uint16 observationCardinalityNext,
-        uint8 feeProtocol,
-        bool unlocked ) = pool.slot0();
-
-        return sqrtPriceX96; // token price ratio token 0 / token 1
-    }
-
-    function getPrimaryToken() public view returns(address)
-    {
-        return pool.token0();
-    }
-
-    function getSecondaryToken() public view returns(address)
-    {
-        return pool.token1();
-    }
-
-    function getPrimaryPrice() public view returns(uint256)
-    {
-        return ((uint256(getX96()) ** 2) / (2 ** 192));
-    }
-
-    function getSecondaryPrice() public view returns(uint256)
-    {
-        return (2 ** 192 * (10**16)) / (uint256(getX96()) ** 2);
-    }
-
 }
+
+//     this price feed could be tested - e.g. with the following uniswap v3 contracts
+
+//     Ethereum Mainnet
+//     pools["USDC/ETH05"] = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
+//     pools["USDC/ETH3"]  = 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8;
+//     pools["DAI/USDC01"]  = 0x5777d92f208679DB4b9778590Fa3CAB3aC9e2168;
+//     pools["WBTC/ETH3"]  = 0xCBCdF9626bC03E24f779434178A73a0B4bad62eD;
+
+//     Arbitrum
+//     pools["USDC/ETH05"] = 0xC31E54c7a869B9FcBEcc14363CF510d1c41fa443;
+//     pools["USDC/ETH3"]  = 0x17c14D2c404D167802b16C450d3c99F88F2c4F4d;
+//     pools["WBTC/ETH05"] = 0x2f5e87C9312fa29aed5c179E456625D79015299c;
+//     pools["WBTC/ETH3"]  = 0x149e36E72726e0BceA5c59d40df2c43F60f5A22D;
+//     pools["GMX/ETH1"]   = 0x80A9ae39310abf666A87C743d6ebBD0E8C42158E;
