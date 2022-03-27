@@ -6,20 +6,34 @@ import { priceFeedABI } from './abis-for-usage-examples/price-feed-abi.ts';
 
 const providerURL = Deno.args[0]
 
-const web3 = new Web3(new Web3.providers.HttpProvider(providerURL))
+export class BlockchainProxy {
 
-setTimeout(async () => {
+    private web3: Web3
 
-    const balanceInWei = await web3.eth.getBalance("0x7a915e362353d72570dcf90aa5baa1c5b341c7aa")
+    public constructor(providerURL: string) {
+        this.web3 = new Web3(new Web3.providers.HttpProvider(providerURL))
+    }
 
-    const priceFeedContract = new web3.eth.Contract(priceFeedABI as any, "0x76E9A039136DE9D53AA1f6254eEd8084Ec3189d0", {});
+    public getPrice() {
 
-    const chainId = await priceFeedContract.methods.getChainID()
-    const lpAddress = priceFeedContract.methods.getLiquidityPoolAddress(42161, "USDC/ETH3")
-
-    console.log(`the chainId  is ${chainId}`)
-
-
-}, 1000)
+        let balanceInWei
+        balanceInWei = await this.web3.eth.getBalance("spengler.eth")
 
 
+        console.log(balanceInWei)
+        const priceFeedContract = new this.web3.eth.Contract(priceFeedABI as any, "0x132Dee45D5F31e108fa5D8F94F41aa439eAdaf6D", {});
+
+        const chainId = await priceFeedContract.methods.getChainID().call()
+        const lpAddress = priceFeedContract.methods.getLiquidityPoolAddress(42161, "USDC/ETH3").call()
+
+        console.log(`the chainId  is ${chainId}`)
+
+
+
+
+
+    }
+}
+
+const blockchainProxy = new BlockchainProxy(providerURL)
+blockchainProxy.getPrice()
